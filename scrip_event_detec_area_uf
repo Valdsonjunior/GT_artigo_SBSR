@@ -1,0 +1,100 @@
+-- NÚMERO DE EVENTOS, DETECCOES E ÁREA DE EVENTOS PARA UF
+
+-- Criação de uma tabela de datas temporária para o intervalo especificado
+
+WITH RECURSIVE DateRange AS ( 
+    	SELECT '2021-01-01'::date AS dt    -- DEFINIR DATA DE INICIO DO RANGER
+    	UNION ALL 
+    	SELECT (dt + INTERVAL '1 day')::date 
+    	FROM DateRange 
+    	WHERE (dt + INTERVAL '1 day') <= '2025-01-01'::date  --DEFINIR DATA FINAL DO RANGER
+), 
+
+
+--União mv_indicadores_queimadas e mv_indicadores_queimadas_2	
+
+mv_indicadores_full AS (
+	SELECT 
+		id,
+		id_evento,
+		id_status_evento,
+		dt_passagem,
+	    geom_acumulada,
+		area_total_evento_ha
+	FROM queimadas.mv_indicadores_queimadas
+	UNION
+	SELECT 
+		id,
+		id_evento,
+		id_status_evento,
+		dt_passagem,
+	    geom_acumulada,
+		area_total_evento_ha
+	FROM queimadas.mv_indicadores_queimadas2
+),  
+	
+-- Subconsulta para eventos de fogo 
+
+eventos_fogo AS ( 
+SELECT  
+        DATE(ev1.dt_minima) AS dt_minima, 
+        COUNT(ev1.dt_minima) AS num_eventos 
+FROM  
+        queimadas.tb_evento AS ev1 
+JOIN  
+        bases_auxiliares.ibge_bc250_lim_unidade_federacao_a AS ep1 
+        ON ST_Intersects(ev1.geom, ep1.geom) 
+JOIN  
+        queimadas.tb_escopo_queimadas AS escopo 
+        ON ST_Intersects(ev1.geom, escopo.geom) 
+WHERE  
+        ev1.id_status_evento IN (1, 2, 3)
+        AND ev1.area_km2 > 1 
+        AND ep1.sigla = 'AM' -- FILTRO SIGLA DA UNIDADE DA FEDERAÇÃO DE INTERESSE EVENTOS DE FOGO
+        AND ev1.dt_minima >= '2021-01-01' 
+        AND ev1.dt_minima <= '2025-01-01' -- DEFINE O PERIODO INVESTIGADO PARA OS EVENTOS DE FOGO
+GROUP BY  
+        DATE(ev1.dt_minima) 
+),   
+
+--Subconsulta para área de influência
+
+area_influencia AS (
+SELECT 
+  	TO_CHAR(dt_passagem, 'YYYY/MM/DD')::date as data,	
+  	count(*) as deteccoes,
+    SUM(area_total_evento_ha)::double precision as area_influen_ha
+FROM 
+  	mv_indicadores_full mv2
+JOIN  
+ 	 bases_auxiliares.ibge_bc250_lim_unidade_federacao_a AS ep 
+  	ON ST_Intersects(mv2.geom_acumulada, ep.geom)
+JOIN  
+  	queimadas.tb_escopo_queimadas AS escopo 
+  	ON ST_Intersects(mv2.geom_acumulada, escopo.geom) 
+WHERE  
+	ep.sigla = 'AM'  -- FILTRO SIGLA DA UNIDADE DA FEDERAÇÃO DE INTERESSE ÁREA DE INFLUENCIA
+	AND mv2.dt_passagem >= '2021-01-01'
+	AND mv2.dt_passagem <= '2025-01-01' -- DEFINE O PERIODO INVESTIGADO PARA ÁREA DE INFLUENCIA
+GROUP BY 
+  	data
+)
+	
+-- Consulta principal que combina as datas com os eventos de fogo 
+SELECT  
+    	dr.dt AS "Data", 
+	COALESCE(ef.num_eventos, 0) AS "Num. de Eventos",
+	COALESCE(ai.deteccoes, 0) AS "Num. de Deteccoes",
+	COALESCE(ai.area_influen_ha, 0) AS "Area de influencia" 
+FROM  
+	DateRange dr 
+LEFT JOIN  
+    	eventos_fogo ef 
+ON  
+   	 dr.dt = ef.dt_minima 
+LEFT JOIN
+    	area_influencia ai
+ON  
+    	dr.dt = ai.data
+ORDER BY  
+    	dr.dt ASC; 
