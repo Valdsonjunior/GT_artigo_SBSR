@@ -23,20 +23,43 @@
 SELECT 
   	TO_CHAR(dt_passagem, 'YYYY/MM/DD')::date as data,	
   	count(*) as deteccoes,
-  	SUM(area_total_evento_ha) as area_influen_ha
+    SUM(area_total_evento_ha)::double precision as area_influen_ha
 FROM 
   	queimadas.mv_indicadores_queimadas mv1
 JOIN  
  	 bases_auxiliares.ibge_bc250_lim_unidade_federacao_a AS ep 
-  	ON ST_Intersects(mv1.geom_acumulada, ep.geom) -- Interseção com a máscara de escopo espacial 
+  	ON ST_Intersects(mv1.geom_acumulada, ep.geom)
 JOIN  
   	queimadas.tb_escopo_queimadas AS escopo 
   	ON ST_Intersects(mv1.geom_acumulada, escopo.geom) 
 WHERE  
-	ep.sigla = 'AM' -- Filtro para a Unidade Federativa de escolha   
-	AND mv1.dt_passagem >= '2024-01-01' 
-	AND mv1.dt_passagem <= '2025-01-01' -- Define período a ser investigado 	
+	ep.sigla = 'AM'
+	AND mv1.dt_passagem >= '2024-01-01'
+	AND mv1.dt_passagem <= '2025-01-01'
 GROUP BY 
-  	data
+  	data;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+Passo 03
+--Subconsulta para eventos de fogo
+SELECT  
+        DATE(ev1.dt_minima) AS dt_minima, 
+        COUNT(ev1.dt_minima) AS num_eventos 
+FROM  
+        queimadas.tb_evento AS ev1 
+JOIN  
+        bases_auxiliares.ibge_bc250_lim_unidade_federacao_a AS ep1 
+        ON ST_Intersects(ev1.geom, ep1.geom) -- Interseção com a máscara de escopo espacial 
+JOIN  
+        queimadas.tb_escopo_queimadas AS escopo 
+        ON ST_Intersects(ev1.geom, escopo.geom) 
+WHERE  
+        ev1.id_status_evento IN (1, 2, 3) -- Condição de eventos ativos, em observação
+        AND ev1.area_km2 > 1 -- Condição de área maior que 1km2 
+        AND ep1.sigla = 'AM' -- Filtro  
+        AND ev1.dt_minima >= '2024-01-01' 
+        AND ev1.dt_minima <= '2025-01-01' -- Define período a ser investigado 
+GROUP BY  
+        DATE(ev1.dt_minima) 
+),   
 
