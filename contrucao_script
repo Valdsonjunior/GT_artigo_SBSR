@@ -1,0 +1,42 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+--Passo 01
+--União mv_indicadores_queimadas e mv_indicadores_queimadas_2	
+	SELECT 
+		id,
+		id_evento,
+		id_status_evento,
+		dt_passagem,
+		area_total_evento_ha
+	FROM queimadas.mv_indicadores_queimadas
+	UNION
+	SELECT 
+		id,
+		id_evento,
+		id_status_evento,
+		dt_passagem,
+		area_total_evento_ha
+	FROM queimadas.mv_indicadores_queimadas2
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+--Passo 02
+--Subconsulta para área de influência
+SELECT 
+  	TO_CHAR(dt_passagem, 'YYYY/MM/DD')::date as data,	
+  	count(*) as deteccoes,
+  	SUM(area_total_evento_ha) as area_influen_ha
+FROM 
+  	queimadas.mv_indicadores_queimadas mv1
+JOIN  
+ 	 bases_auxiliares.ibge_bc250_lim_unidade_federacao_a AS ep 
+  	ON ST_Intersects(mv1.geom_acumulada, ep.geom) -- Interseção com a máscara de escopo espacial 
+JOIN  
+  	queimadas.tb_escopo_queimadas AS escopo 
+  	ON ST_Intersects(mv1.geom_acumulada, escopo.geom) 
+WHERE  
+	ep.sigla = 'AM' -- Filtro para a Unidade Federativa de escolha   
+	AND mv1.dt_passagem >= '2024-01-01' 
+	AND mv1.dt_passagem <= '2025-01-01' -- Define período a ser investigado 	
+GROUP BY 
+  	data
+
+
