@@ -11,7 +11,7 @@ WITH RECURSIVE DateRange AS (
 ), 
 
 
---União mv_indicadores_queimadas e mv_indicadores_queimadas_2	
+--União mv_indicadores_queimadas e mv_indicadores_queimadas2	
 
 mv_indicadores_full AS (
 	SELECT 
@@ -19,8 +19,9 @@ mv_indicadores_full AS (
 		id_evento,
 		id_status_evento,
 		dt_passagem,
-	    geom_acumulada,
-		area_total_evento_ha
+	        geom_acumulada,
+		area_acumulada_ha,
+		delta_area_ha
 	FROM queimadas.mv_indicadores_queimadas
 	UNION
 	SELECT 
@@ -28,8 +29,9 @@ mv_indicadores_full AS (
 		id_evento,
 		id_status_evento,
 		dt_passagem,
-	    geom_acumulada,
-		area_total_evento_ha
+	        geom_acumulada,
+ 		area_acumulada_ha,
+		delta_area_ha
 	FROM queimadas.mv_indicadores_queimadas2
 ),  
 	
@@ -63,7 +65,10 @@ area_influencia AS (
 SELECT 
   	TO_CHAR(dt_passagem, 'YYYY/MM/DD')::date as data,	
   	count(*) as deteccoes,
-    SUM(area_total_evento_ha)::double precision as area_influen_ha
+    SUM(CASE 
+        WHEN delta_area_ha = 0 THEN (SELECT MIN(area_acumulada_ha) FROM mv_indicadores_full)
+        ELSE delta_area_ha
+    END)::double precision as area_influen_ha
 FROM 
   	mv_indicadores_full mv2
 JOIN  
