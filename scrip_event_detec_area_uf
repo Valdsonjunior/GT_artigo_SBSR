@@ -19,6 +19,7 @@ mv_indicadores_full AS (
 		id_evento,
 		id_status_evento,
 		dt_passagem,
+		dt_min_evento,
 	        geom_acumulada,
 		area_acumulada_ha,
 		delta_area_ha
@@ -29,6 +30,7 @@ mv_indicadores_full AS (
 		id_evento,
 		id_status_evento,
 		dt_passagem,
+		dt_min_evento,
 	        geom_acumulada,
  		area_acumulada_ha,
 		delta_area_ha
@@ -66,7 +68,7 @@ SELECT
   	TO_CHAR(dt_passagem, 'YYYY/MM/DD')::date as data,	
   	count(*) as deteccoes,
     SUM(CASE 
-        WHEN delta_area_ha = 0 THEN area_acumulada_ha
+        WHEN dt_passagem = dt_min_evento THEN area_acumulada_ha
         ELSE delta_area_ha
     END)::double precision as area_influen_ha
 FROM 
