@@ -63,3 +63,14 @@ GROUP BY
         DATE(ev1.dt_minima) 
 ),   
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+Passo 04
+--Corrigir a soma de área por detecções. Teste com ID:506682
+SELECT SUM(
+    CASE 
+        WHEN delta_area_ha = 0 THEN (SELECT MIN(area_acumulada_ha) FROM queimadas.mv_indicadores_queimadas WHERE id_evento = '5066822')
+        ELSE delta_area_ha
+    END
+) AS soma_ajustada
+FROM queimadas.mv_indicadores_queimadas
+WHERE id_evento = '5066822';
